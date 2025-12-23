@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, Eye, Zap, Star, Settings } from "lucide-react";
-import PICKUP from "./assets/pickblock.ogg";
-import PLACE from "./assets/pickupblock.ogg";
-import CLEAR_1 from "./assets/clear.ogg";
-import COMBO from "./assets/clear2.ogg";
-import GAMEOVER from "./assets/gameover.ogg";
-import PERFECT from "./assets/perfect.ogg";
-import GOOD from "./assets/good.ogg";
-import AMAZING from "./assets/amazing.ogg";
-import GAMESTART from "./assets/gamestart.ogg";
 
 const BOARD_SIZE = 8;
 const THEME_PINK = "#F06292"; 
@@ -73,30 +64,25 @@ export default function App() {
   const [selectedIdx, setSelectedIdx] = useState(null);
   const [hoverPos, setHoverPos] = useState(null);
   const [gameOver, setGameOver] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const playSound = (url) => {
-  const audio = new Audio(url);
-  audio.volume = 0.4; // Set global volume (0.0 to 1.0)
-  audio.currentTime = 0; 
-  audio.play().catch(e => console.log("Audio play blocked until user interaction"));
-};
+    // Sounds disabled for demo
+  };
 
-// Placeholder Sound URLs (You can replace these with your own .mp3 files)
-const SOUNDS = {
-  PICKUP,
-  PLACE,
-  CLEAR_1,
-  COMBO,
-  PERFECT,
-  GAMEOVER,
-  GOOD,
-  AMAZING,
-  GAMESTART,
-};
-
+  const SOUNDS = {
+    PICKUP: "",
+    PLACE: "",
+    CLEAR_1: "",
+    COMBO: "",
+    PERFECT: "",
+    GAMEOVER: "",
+    GOOD: "",
+    AMAZING: "",
+    GAMESTART: "",
+  };
 
   const generateBatch = () => Array(3).fill(0).map(() => {
-    // random base shape
     const base = SHAPES[Math.floor(Math.random() * SHAPES.length)];
     let finalShape = base.shape;
     
@@ -111,33 +97,6 @@ const SOUNDS = {
       name: base.name,
     };
   });
-
-  const checkLinesAndPoints = (currentBoard) => {
-  let newBoard = currentBoard.map(row => [...row]);
-  let rowsToClear = [];
-  let colsToClear = [];
-
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    if (newBoard[r].every(cell => cell !== null)) rowsToClear.push(r);
-  }
-  for (let c = 0; c < BOARD_SIZE; c++) {
-    let colFull = true;
-    for (let r = 0; r < BOARD_SIZE; r++) {
-      if (newBoard[r][c] === null) colFull = false;
-    }
-    if (colFull) colsToClear.push(c);
-  }
-
-  const linesCleared = rowsToClear.length + colsToClear.length;
-  const pointsFromLines = linesCleared * 10 * linesCleared;
-
-  rowsToClear.forEach(r => newBoard[r].fill(null));
-  colsToClear.forEach(c => {
-    for (let r = 0; r < BOARD_SIZE; r++) newBoard[r][c] = null;
-  });
-
-  return { clearedBoard: newBoard, pointsFromLines };
-};
 
   const handleRetry = () => {
     playSound(SOUNDS.GAMESTART);
@@ -169,97 +128,132 @@ const SOUNDS = {
 
   const [feedback, setFeedback] = useState(null);
 
-  const handlePlacement = (r, c) => {
-  if (selectedIdx === null || gameOver) return;
-  const block = hand[selectedIdx];
-  
-  if (canPlace(block.shape, r, c, board)) {
+  const handleTouchStart = (idx, e) => {
+    if (gameOver) return;
+    e.stopPropagation();
+    setSelectedIdx(idx);
+    setIsDragging(true);
+    playSound(SOUNDS.PICKUP);
+  };
 
-    playSound(SOUNDS.PLACE);
-
-    const tilesPlaced = block.shape.flat().filter(t => t === 1).length;
-    let newBoard = board.map(row => [...row]);
+  const handleTouchMove = (e) => {
+    if (!isDragging || selectedIdx === null) return;
     
-    block.shape.forEach((rowArr, i) => {
-      rowArr.forEach((val, j) => {
-        if (val === 1) newBoard[r + i][c + j] = true;
-      });
-    });
-
-    let rowsToClear = [], colsToClear = [];
-    for (let i = 0; i < BOARD_SIZE; i++) {
-      if (newBoard[i].every(cell => cell !== null)) rowsToClear.push(i);
-      if (newBoard.every(row => row[i] !== null)) colsToClear.push(i);
-    }
-
-    // calculate
-    const lineCount = rowsToClear.length + colsToClear.length;
-
-    if (lineCount === 1) {
-      playSound(SOUNDS.CLEAR_1);
-      playSound(SOUNDS.GOOD);
-    } else if (lineCount >= 2) {
-      playSound(SOUNDS.COMBO);
-      playSound(SOUNDS.AMAZING);
-    }
-
+    const touch = e.touches[0];
+    const boardElement = document.querySelector('[data-board="true"]');
+    if (!boardElement) return;
     
-    const linePoints = lineCount * 100 * lineCount;
+    const rect = boardElement.getBoundingClientRect();
+    const cellSize = rect.width / BOARD_SIZE;
     
-    // clear
-    rowsToClear.forEach(ri => newBoard[ri].fill(null));
-    colsToClear.forEach(ci => { for(let i=0; i<BOARD_SIZE; i++) newBoard[i][ci] = null; });
-
-    // TOTAL BOARD CLEAR
-    let boardClearBonus = 0;
-    const isBoardEmpty = newBoard.every(row => row.every(cell => cell === null));
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
     
-    if (isBoardEmpty && lineCount > 0) {
-      playSound(SOUNDS.PERFECT);
-      boardClearBonus = 1000;
-      setFeedback({ text: "PERFECT CLEAR!", type: "clear" });
-    } else if (lineCount > 0) {
-      setFeedback({ text: `+${linePoints}`, type: "points" });
-    }
-
-    // Auto-remove feedback after 1 second
-    setTimeout(() => setFeedback(null), 1000);
-
-    // update score
-    const newScore = score + tilesPlaced + linePoints + boardClearBonus;
-    setScore(newScore);
-    
-    if (newScore > highScore) {
-      setHighScore(newScore);
-      localStorage.setItem("pinkBlastHS", newScore.toString());
-    }
-
-    // updateStateAndHand
-    setBoard(newBoard);
-    const newHand = hand.filter((_, idx) => idx !== selectedIdx);
-    setSelectedIdx(null);
-    
-    if (newHand.length === 0) {
-      setHand(nextHand);
-      setNextHand(generateBatch());
+    if (x >= 0 && x < rect.width && y >= 0 && y < rect.height) {
+      const c = Math.floor(x / cellSize);
+      const r = Math.floor(y / cellSize);
+      if (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE) {
+        setHoverPos({ r, c });
+      }
     } else {
-      setHand(newHand);
-      // checkGameOver
-      const isStillPlayable = newHand.some(b => {
-        for(let row=0; row<BOARD_SIZE; row++) {
-          for(let col=0; col<BOARD_SIZE; col++) {
-            if (canPlace(b.shape, row, col, newBoard)) return true;
-          }
-        }
-        return false;
-      });
-      if (!isStillPlayable) {
-        setGameOver(true);
-        playSound(SOUNDS.GAMEOVER);
-      };
+      setHoverPos(null);
     }
-  }
-};
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!isDragging) return;
+    
+    if (hoverPos && selectedIdx !== null) {
+      handlePlacement(hoverPos.r, hoverPos.c);
+    }
+    
+    setIsDragging(false);
+    setSelectedIdx(null);
+    setHoverPos(null);
+  };
+
+  const handlePlacement = (r, c) => {
+    if (selectedIdx === null || gameOver) return;
+    const block = hand[selectedIdx];
+    
+    if (canPlace(block.shape, r, c, board)) {
+      playSound(SOUNDS.PLACE);
+
+      const tilesPlaced = block.shape.flat().filter(t => t === 1).length;
+      let newBoard = board.map(row => [...row]);
+      
+      block.shape.forEach((rowArr, i) => {
+        rowArr.forEach((val, j) => {
+          if (val === 1) newBoard[r + i][c + j] = true;
+        });
+      });
+
+      let rowsToClear = [], colsToClear = [];
+      for (let i = 0; i < BOARD_SIZE; i++) {
+        if (newBoard[i].every(cell => cell !== null)) rowsToClear.push(i);
+        if (newBoard.every(row => row[i] !== null)) colsToClear.push(i);
+      }
+
+      const lineCount = rowsToClear.length + colsToClear.length;
+
+      if (lineCount === 1) {
+        playSound(SOUNDS.CLEAR_1);
+        playSound(SOUNDS.GOOD);
+      } else if (lineCount >= 2) {
+        playSound(SOUNDS.COMBO);
+        playSound(SOUNDS.AMAZING);
+      }
+
+      const linePoints = lineCount * 100 * lineCount;
+      
+      rowsToClear.forEach(ri => newBoard[ri].fill(null));
+      colsToClear.forEach(ci => { for(let i=0; i<BOARD_SIZE; i++) newBoard[i][ci] = null; });
+
+      let boardClearBonus = 0;
+      const isBoardEmpty = newBoard.every(row => row.every(cell => cell === null));
+      
+      if (isBoardEmpty && lineCount > 0) {
+        playSound(SOUNDS.PERFECT);
+        boardClearBonus = 1000;
+        setFeedback({ text: "PERFECT CLEAR!", type: "clear" });
+      } else if (lineCount > 0) {
+        setFeedback({ text: `+${linePoints}`, type: "points" });
+      }
+
+      setTimeout(() => setFeedback(null), 1000);
+
+      const newScore = score + tilesPlaced + linePoints + boardClearBonus;
+      setScore(newScore);
+      
+      if (newScore > highScore) {
+        setHighScore(newScore);
+        localStorage.setItem("pinkBlastHS", newScore.toString());
+      }
+
+      setBoard(newBoard);
+      const newHand = hand.filter((_, idx) => idx !== selectedIdx);
+      setSelectedIdx(null);
+      
+      if (newHand.length === 0) {
+        setHand(nextHand);
+        setNextHand(generateBatch());
+      } else {
+        setHand(newHand);
+        const isStillPlayable = newHand.some(b => {
+          for(let row=0; row<BOARD_SIZE; row++) {
+            for(let col=0; col<BOARD_SIZE; col++) {
+              if (canPlace(b.shape, row, col, newBoard)) return true;
+            }
+          }
+          return false;
+        });
+        if (!isStillPlayable) {
+          setGameOver(true);
+          playSound(SOUNDS.GAMEOVER);
+        };
+      }
+    }
+  };
 
   const isGhostCell = (r, c) => {
     if (!hoverPos || selectedIdx === null) return false;
@@ -270,9 +264,14 @@ const SOUNDS = {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-6 select-none touch-none overflow-hidden" 
-         style={{ backgroundColor: BG_PINK }}
-         onMouseLeave={() => setHoverPos(null)}>
+    <div 
+      className="min-h-screen flex flex-col items-center p-6 select-none overflow-hidden" 
+      style={{ backgroundColor: BG_PINK, touchAction: 'none' }}
+      onMouseLeave={() => setHoverPos(null)}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+    >
       
       <div className="w-full max-w-sm flex justify-between items-start mb-2">
         <div className="flex items-center gap-1 text-yellow-400 drop-shadow-md">
@@ -290,36 +289,46 @@ const SOUNDS = {
 
       <div className="p-2 shadow-2xl" 
            style={{ backgroundColor: GRID_CONTAINER, width: "min(92vw, 380px)", aspectRatio: "1/1" }}>
-        <div className="grid h-full w-full" style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)`, gap: "1px" }}>
+        <div className="grid h-full w-full" data-board="true" style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)`, gap: "1px" }}>
           {board.map((row, r) => row.map((filled, c) => (
             <Cell key={`${r}-${c}`} filled={filled} isGhost={isGhostCell(r, c)} onMouseEnter={() => setHoverPos({ r, c })} onClick={() => handlePlacement(r, c)} />
           )))}
         </div>
         <AnimatePresence>
-  {feedback && (
-    <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.5 }}
-      animate={{ opacity: 1, y: -20, scale: 1.2 }}
-      exit={{ opacity: 0, scale: 1.5 }}
-      className="absolute inset-0 flex items-center justify-center pointer-events-none z-40"
-    >
-      <span className={`
-        font-black tracking-tighter drop-shadow-2xl
-        ${feedback.type === 'clear' 
-          ? "text-5xl text-yellow-300 italic uppercase" 
-          : "text-4xl text-white"}
-      `}>
-        {feedback.text}
-      </span>
-    </motion.div>
-  )}
-</AnimatePresence>
+          {feedback && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.5 }}
+              animate={{ opacity: 1, y: -20, scale: 1.2 }}
+              exit={{ opacity: 0, scale: 1.5 }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-40"
+            >
+              <span className={`
+                font-black tracking-tighter drop-shadow-2xl
+                ${feedback.type === 'clear' 
+                  ? "text-5xl text-yellow-300 italic uppercase" 
+                  : "text-4xl text-white"}
+              `}>
+                {feedback.text}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="flex justify-center items-center gap-4 h-32 mt-12 mb-4 w-full">
         {hand.map((block, idx) => (
-          <BlockPreview key={block.id} block={block} isSelected={selectedIdx === idx} onClick={() => {if (selectedIdx !== idx) playSound(SOUNDS.PICKUP);
-    setSelectedIdx(selectedIdx === idx ? null : idx);}} />
+          <BlockPreview 
+            key={block.id} 
+            block={block} 
+            isSelected={selectedIdx === idx} 
+            onClick={() => {
+              if (selectedIdx !== idx) playSound(SOUNDS.PICKUP);
+              setSelectedIdx(selectedIdx === idx ? null : idx);
+            }}
+            onTouchStart={(e) => {
+              handleTouchStart(idx, e);
+            }}
+          />
         ))}
       </div>
 
