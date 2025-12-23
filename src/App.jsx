@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, Eye, Zap, Star, Settings } from "lucide-react";
+import PICKUP from "./assets/pickblock.ogg";
+import PLACE from "./assets/pickupblock.ogg";
+import CLEAR_1 from "./assets/clear.ogg";
+import COMBO from "./assets/clear2.ogg";
+import GAMEOVER from "./assets/gameover.ogg";
+import PERFECT from "./assets/perfect.ogg";
+import GOOD from "./assets/good.ogg";
+import AMAZING from "./assets/amazing.ogg";
+import GAMESTART from "./assets/gamestart.ogg";
+
 
 const BOARD_SIZE = 8;
 const THEME_PINK = "#F06292"; 
@@ -66,21 +76,24 @@ export default function App() {
   const [gameOver, setGameOver] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  const playSound = (url) => {
-    // Sounds disabled for demo
-  };
+    const playSound = (url) => {
+  const audio = new Audio(url);
+  audio.volume = 0.4; // Set global volume (0.0 to 1.0)
+  audio.currentTime = 0;
+  audio.play().catch(e => console.log("Audio play blocked until user interaction"));
+};
 
   const SOUNDS = {
-    PICKUP: "",
-    PLACE: "",
-    CLEAR_1: "",
-    COMBO: "",
-    PERFECT: "",
-    GAMEOVER: "",
-    GOOD: "",
-    AMAZING: "",
-    GAMESTART: "",
-  };
+  PICKUP,
+  PLACE,
+  CLEAR_1,
+  COMBO,
+  PERFECT,
+  GAMEOVER,
+  GOOD,
+  AMAZING,
+  GAMESTART,
+};
 
   const generateBatch = () => Array(3).fill(0).map(() => {
     const base = SHAPES[Math.floor(Math.random() * SHAPES.length)];
