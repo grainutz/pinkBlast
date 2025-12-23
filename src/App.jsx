@@ -46,11 +46,12 @@ const Cell = ({ filled, isGhost, onClick, onMouseEnter }) => (
   />
 );
 
-const BlockPreview = ({ block, isSelected, onClick, scale = 1 }) => (
+const BlockPreview = ({ block, isSelected, onClick, onTouchStart, scale = 1 }) => (
   <motion.div
     whileHover={{ scale: scale * 1.05 }}
     whileTap={{ scale: scale * 0.95 }}
     onClick={onClick}
+    onTouchStart={onTouchStart}
     className={`grid gap-1 cursor-pointer p-2 transition-all ${isSelected ? "scale-110 -translate-y-4 filter drop-shadow-lg" : ""}`}
     style={{ gridTemplateColumns: `repeat(${block.shape[0].length}, 20px)` }}
   >
